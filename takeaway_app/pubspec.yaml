@@ -1,0 +1,41 @@
+name: takeaway_app
+description: A Flutter takeaway app with Firebase backend
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+
+  # State management
+  provider: ^6.1.0
+
+  # Firebase
+  firebase_core: ^3.0.0
+  firebase_auth: ^5.0.0
+  cloud_firestore: ^5.0.0
+  shared_preferences: ^2.3.0
+  firebase_storage: ^12.0.0
+
+  # Sign-in & UI
+  google_sign_in: ^6.0.0
+  flutter_svg: ^2.0.0
+  google_fonts: ^6.0.0
+  cached_network_image: ^3.2.3
+  shimmer: ^3.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    # Add any asset paths here if you add logos (optional)
+    # - assets/images/google_logo.svg
+    # - assets/images/apple_logo.svg

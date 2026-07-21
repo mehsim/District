@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Takeaway - Splash Preview</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --amber:#FF8C42;
+      --coral:#FF6B6B;
+      --white: #ffffff;
+    }
+    html,body{height:100%;margin:0}
+    body{
+      font-family: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+      background: linear-gradient(180deg,var(--amber) 0%, var(--coral) 100%);
+      display:flex;align-items:center;justify-content:center;color:var(--white);
+      overflow:hidden;
+    }
+    .stage{width:100%;height:100vh;display:flex;flex-direction:column}
+    .center{flex:1;display:flex;align-items:center;justify-content:center}
+    .stack{display:flex;flex-direction:column;align-items:center}
+
+    /* Logo */
+    .logo-wrap{width:120px;height:120px;display:flex;align-items:center;justify-content:center}
+    .logo{width:96px;height:96px;transform:scale(0.6);opacity:0}
+
+    /* Animations approximating the Flutter timings */
+    @keyframes logoScaleIn{
+      0%{transform:scale(0.6);opacity:0}
+      60%{transform:scale(1.08);opacity:1}
+      100%{transform:scale(1);opacity:1}
+    }
+    @keyframes nameSlideUp{
+      0%{transform:translateY(20px);opacity:0}
+      100%{transform:translateY(0);opacity:1}
+    }
+    @keyframes taglineFade{
+      from{opacity:0}
+      to{opacity:1}
+    }
+
+    .brand-name{margin-top:18px;font-size:28px;font-weight:600;color:var(--white);opacity:0;}
+    .tagline{margin-top:8px;font-size:14px;opacity:0;color:rgba(255,255,255,0.95)}
+
+    /* Bottom loader */
+    .bottom{height:80px;display:flex;align-items:center;justify-content:center}
+    .dots{display:flex;gap:6px}
+    .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.95);opacity:0.85;transform:translateY(0)}
+    .dot:nth-child(1){animation:bounce 900ms infinite 0ms}
+    .dot:nth-child(2){animation:bounce 900ms infinite 120ms}
+    .dot:nth-child(3){animation:bounce 900ms infinite 240ms}
+    @keyframes bounce{0%{transform:translateY(0)}50%{transform:translateY(-8px)}100%{transform:translateY(0)}}
+
+    /* Reveal classes triggered by JS with precise delays */
+    .logo.revealed{animation: logoScaleIn 800ms cubic-bezier(.175,.885,.32,1.275) forwards;animation-delay:300ms}
+    .brand-name.revealed{animation:nameSlideUp 600ms ease-out forwards;animation-delay:800ms}
+    .tagline.revealed{animation:taglineFade 500ms ease-in forwards;animation-delay:1100ms}
+
+    /* small control UI */
+    .controls{position:fixed;left:12px;top:12px;background:rgba(255,255,255,0.08);backdrop-filter:blur(6px);padding:10px;border-radius:8px;color:#fff}
+    .controls label{font-size:12px;opacity:0.9}
+    .note{position:fixed;right:12px;bottom:12px;color:rgba(255,255,255,0.9);font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <label for="auth">Simulate auth state:</label>
+    <select id="auth">
+      <option value="none">Not signed in</option>
+      <option value="verified">Signed in — verified</option>
+      <option value="unverified">Signed in — not verified</option>
+    </select>
+  </div>
+
+  <div class="stage" role="main">
+    <div class="center">
+      <div class="stack" aria-hidden="true">
+        <div class="logo-wrap">
+          <!-- simple plate + fork+knife SVG -->
+          <svg class="logo" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <g fill="none" stroke="white" stroke-width="3">
+              <circle cx="32" cy="32" r="18" stroke-opacity="0.95"/>
+            </g>
+            <g fill="white">
+              <!-- fork -->
+              <rect x="12" y="18" width="3.6" height="22" rx="1"/>
+              <rect x="12" y="18" width="3.6" height="6"/>
+              <rect x="12.9" y="18" width="0.9" height="6" fill="#fff"/>
+              <!-- knife -->
+              <path d="M44 16 C52 28,50 36,42 44 L38 40 C44 30,42 22,44 16 Z" fill="white" opacity="0.95"/>
+            </g>
+          </svg>
+        </div>
+        <div class="brand-name" id="brand">Takeaway</div>
+        <div class="tagline" id="tag">Premium flavors, delivered smart</div>
+      </div>
+    </div>
+
+    <div class="bottom">
+      <div class="dots" aria-hidden="true">
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">Preview: animations follow the Flutter timing (2.5s total). After animation completes a simulated routing message will appear.</div>
+
+  <script>
+    // Controls and sequencing
+    const logo = document.querySelector('.logo');
+    const brand = document.getElementById('brand');
+    const tag = document.getElementById('tag');
+    const authSelect = document.getElementById('auth');
+
+    function startSequence(){
+      // clear any existing classes
+      logo.classList.remove('revealed');
+      brand.classList.remove('revealed');
+      tag.classList.remove('revealed');
+
+      // start timed reveals to match Flutter delays
+      setTimeout(()=> logo.classList.add('revealed'), 0); // animation has its internal delay
+      setTimeout(()=> brand.classList.add('revealed'), 0);
+      setTimeout(()=> tag.classList.add('revealed'), 0);
+
+      // total sequence 2500ms
+      setTimeout(() => decideRoute(), 2500);
+    }
+
+    function decideRoute(){
+      const state = authSelect.value;
+      if(state === 'verified'){
+        alert('Routing: user signed in and verified → HomePage (/home) [fade]');
+      } else if(state === 'unverified'){
+        alert('Routing: user signed in but not verified → EmailVerificationPage (/email-verification)');
+      } else {
+        alert('Routing: no user → SignInPage (/signin) [slide-from-right]');
+      }
+    }
+
+    // Start on load
+    window.addEventListener('load', ()=>{
+      // Kick the CSS keyframe animations by toggling classes after small timeouts matching the internal animation-delay in CSS
+      // Logo anim has delay 300ms in CSS, but here we trigger class now and CSS handles delay
+      startSequence();
+    });
+
+    // Restart when control changes
+    authSelect.addEventListener('change', ()=>{
+      startSequence();
+    });
+  </script>
+</body>
+</html>

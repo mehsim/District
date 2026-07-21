@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>518698127442-nsihmg2f3qpa32eoohmch107212l492i.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.518698127442-nsihmg2f3qpa32eoohmch107212l492i</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>518698127442-0g68thtfj0s6te77c7jugnvspim0uumv.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyB44pY9N0nAdXrpcFlQBYWOwlS0ykq_eKw</string>
+	<key>GCM_SENDER_ID</key>
+	<string>518698127442</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.example.takeawayApp</string>
+	<key>PROJECT_ID</key>
+	<string>districtfood-e0f9b</string>
+	<key>STORAGE_BUCKET</key>
+	<string>districtfood-e0f9b.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:518698127442:ios:82064ed85000cee3144f8b</string>
+</dict>
+</plist>

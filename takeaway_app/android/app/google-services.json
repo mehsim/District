@@ -1,0 +1,126 @@
+{
+  "project_info": {
+    "project_number": "518698127442",
+    "project_id": "districtfood-e0f9b",
+    "storage_bucket": "districtfood-e0f9b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:518698127442:android:67a13d5b1f022c64144f8b",
+        "android_client_info": {
+          "package_name": "com.example.takeaway_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "518698127442-brd0s3mtksltkihqg0o5h0ertbo56e52.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-4Wg8TIsTeWHzttcxQniNWCchSAHy74U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "518698127442-brd0s3mtksltkihqg0o5h0ertbo56e52.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "518698127442-8jqrauqsccfj8imdn15ref1smocsmkb6.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.mycompany.districttakeaway"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:518698127442:android:e7859c02ef7f0c03144f8b",
+        "android_client_info": {
+          "package_name": "com.mycompany.district"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "518698127442-brd0s3mtksltkihqg0o5h0ertbo56e52.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-4Wg8TIsTeWHzttcxQniNWCchSAHy74U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "518698127442-brd0s3mtksltkihqg0o5h0ertbo56e52.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "518698127442-8jqrauqsccfj8imdn15ref1smocsmkb6.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.mycompany.districttakeaway"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:518698127442:android:5534a58bf059cce6144f8b",
+        "android_client_info": {
+          "package_name": "com.mycompany.districttakeaway"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "518698127442-0g68thtfj0s6te77c7jugnvspim0uumv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mycompany.districttakeaway",
+            "certificate_hash": "9bbb3186b2189ef16d8f272bdab59362c395cbb4"
+          }
+        },
+        {
+          "client_id": "518698127442-brd0s3mtksltkihqg0o5h0ertbo56e52.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-4Wg8TIsTeWHzttcxQniNWCchSAHy74U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "518698127442-brd0s3mtksltkihqg0o5h0ertbo56e52.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "518698127442-8jqrauqsccfj8imdn15ref1smocsmkb6.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.mycompany.districttakeaway"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
