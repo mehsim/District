@@ -65,9 +65,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
   }
 
+  String _sanitize(String input) {
+    return input.trim().replaceAll(RegExp(r'[<>"' "']"), '').replaceAll(RegExp(r'\s+'), ' ');
+  }
+
   String? _validateName(String? v) {
     if (v == null || v.trim().length < 2) return 'Enter your full name';
-    if (!RegExp(r'^[A-Za-z ]+$').hasMatch(v.trim())) return 'Only letters and spaces allowed';
+    if (!RegExp(r"^[a-zA-Z\s'-]+$").hasMatch(v.trim())) return 'Please enter a valid name';
     return null;
   }
 
@@ -77,7 +81,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   String? _validatePhone(String? v) {
-    if (v == null || v.trim().length < 7) return 'Enter a valid phone number';
+    if (v == null || !RegExp(r'^\+?[0-9\s-]{7,15}$').hasMatch(v.trim())) return 'Enter a valid phone number';
     return null;
   }
 
@@ -103,27 +107,27 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => _isLoading = true);
     try {
       final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailCtrl.text.trim(),
+        email: _emailCtrl.text.trim().toLowerCase(),
         password: _passwordCtrl.text,
       );
       final user = cred.user;
       if (user != null) {
-        // update display name
-        await user.updateDisplayName(_fullNameCtrl.text.trim());
-        // create user doc
+        final sanitizedName = _sanitize(_fullNameCtrl.text);
+        final sanitizedPhone = _sanitize(_phoneCtrl.text);
+        await user.updateDisplayName(sanitizedName);
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'fullName': _fullNameCtrl.text.trim(),
-          'email': _emailCtrl.text.trim(),
-          'phone': _phoneCtrl.text.trim(),
+          'fullName': sanitizedName,
+          'email': _emailCtrl.text.trim().toLowerCase(),
+          'phone': sanitizedPhone,
           'createdAt': FieldValue.serverTimestamp(),
           'role': 'customer',
           'favorites': [],
           'addresses': [],
         });
-        // send verification (still send it but let user continue into the app)
         await user.sendEmailVerification();
-        // Route to home so the user can start using the app immediately
-        Navigator.of(context).pushReplacementNamed('/home');
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed('/email-verification');
+        }
       }
     } on FirebaseAuthException catch (e) {
       String msg;
@@ -144,7 +148,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to create account')));
     }
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   @override

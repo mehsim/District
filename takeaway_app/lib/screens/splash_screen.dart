@@ -44,33 +44,24 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       CurvedAnimation(parent: _controller, curve: Interval(0.44, 0.64, curve: Curves.easeIn)),
     );
 
-    // Start the animation sequence
-    _controller.forward();
-
-    // During animation, check auth state (first emission)
-    FirebaseAuth.instance.authStateChanges().first.then((user) {
-      _authUser = user;
-    }).catchError((_) {
-      _authUser = null;
+    Future.wait([
+      _controller.forward(),
+      FirebaseAuth.instance.authStateChanges().first,
+    ]).then((results) {
+      final user = results[1] as User?;
+      if (mounted) _routeNext(user);
     });
-
-    // After the animation completes (2.5s), decide where to go
-    Future.delayed(Duration(milliseconds: 2500)).then((_) => _routeNext());
   }
 
-  void _routeNext() async {
+  void _routeNext(User? user) async {
     if (!mounted) return;
-
-    final user = _authUser;
-
     if (user != null) {
       await user.reload().catchError((_) {});
-    }
-
-    // If there's a current user, route to home; otherwise go to sign in.
-    if (!mounted) return;
-
-    if (user != null) {
+      if (!mounted) return;
+      if (!user.emailVerified) {
+        Navigator.of(context).pushReplacementNamed('/email-verification');
+        return;
+      }
       Navigator.of(context).pushReplacementNamed('/home');
     } else {
       Navigator.of(context).pushReplacementNamed('/signin');

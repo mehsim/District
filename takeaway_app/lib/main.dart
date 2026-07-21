@@ -59,7 +59,11 @@ class AuthGate extends StatelessWidget {
       stream: auth.authStateChanges,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return SplashScreen();
-        if (snapshot.hasData) return HomeScreen();
+        if (snapshot.hasData) {
+          final user = snapshot.data!;
+          if (!user.emailVerified) return EmailVerificationScreen();
+          return const HomeScreen();
+        }
         return SignInScreen();
       },
     );

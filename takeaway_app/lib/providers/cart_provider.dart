@@ -30,11 +30,11 @@ class CartProvider extends ChangeNotifier {
   }
 
   double get totalPrice {
-    double total = 0.0;
+    int totalCents = 0;
     _items.forEach((_, item) {
-      total += item.price * item.quantity;
+      totalCents += (item.price * 100).round() * item.quantity;
     });
-    return total;
+    return totalCents / 100.0;
   }
 
   void addItem(String id, String name, double price, String? imageUrl) {

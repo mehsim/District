@@ -61,6 +61,7 @@ class _HomeScreenState extends State<HomeScreen>
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _allSearchProducts = [];
+  Timer? _searchDebounce;
 
   // Carousel
   final PageController _pageController = PageController(viewportFraction: 0.92);
@@ -75,8 +76,8 @@ class _HomeScreenState extends State<HomeScreen>
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    _fetchAll();
     _loadFavorites();
+    _fetchAll();
     _loadUserSettings();
   }
 
@@ -84,6 +85,7 @@ class _HomeScreenState extends State<HomeScreen>
   void dispose() {
     _carouselTimer?.cancel();
     _resumeTimer?.cancel();
+    _searchDebounce?.cancel();
     _pageController.dispose();
     _scrollController.dispose();
     _searchController.dispose();
@@ -315,7 +317,7 @@ class _HomeScreenState extends State<HomeScreen>
         FirebaseFirestore.instance.collection('fastFoodCategories').get(),
         FirebaseFirestore.instance.collection('kidsMenuCategories').get(),
         FirebaseFirestore.instance.collection('drinksCategories').get(),
-      ]).timeout(const Duration(seconds: 3));
+      ]).timeout(const Duration(seconds: 10));
 
       final dealsDocs = (results[0] as QuerySnapshot).docs;
       final desiDocs = (results[1] as QuerySnapshot).docs;
@@ -1460,7 +1462,12 @@ class _HomeScreenState extends State<HomeScreen>
               ),
               child: TextField(
                 controller: _searchController,
-                onChanged: (val) => setState(() => _searchQuery = val),
+                onChanged: (val) {
+                  _searchDebounce?.cancel();
+                  _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+                    if (mounted) setState(() => _searchQuery = val);
+                  });
+                },
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 15,
@@ -2009,45 +2016,73 @@ class _HomeScreenState extends State<HomeScreen>
       );
 
   Future<void> _placeOrder(CartProvider cart) async {
-    final order = {
-      'items': cart.items.values.map((i) => {'name': i.name, 'qty': i.quantity, 'price': i.price}).toList(),
-      'total': cart.totalPrice,
-      'type': _isDelivery ? 'delivery' : 'pickup',
-      'payment': _paymentMethod,
-      'timestamp': DateTime.now().toIso8601String(),
-    };
-    // Award loyalty points (1 point per £1 spent)
-    await UserDataService.addLoyaltyPoints(cart.totalPrice);
-    cart.clear();
-    if (mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF1A1A2E),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 64),
-            const SizedBox(height: 12),
-            const Text('Order Placed! 🎉', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
-            const SizedBox(height: 8),
-            Text(
-              '${_isDelivery ? "Delivery" : "Pickup"} · $_paymentMethod on ${_isDelivery ? "delivery" : "pickup"}',
-              style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B35), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                onPressed: () { Navigator.pop(ctx); setState(() => _currentIndex = 0); },
-                child: const Text('Back to Menu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please sign in to place an order.')));
+      return;
+    }
+
+    try {
+      final orderRef = FirebaseFirestore.instance.collection('orders').doc();
+      final batch = FirebaseFirestore.instance.batch();
+
+      batch.set(orderRef, {
+        'orderId': orderRef.id,
+        'userId': user.uid,
+        'userEmail': user.email,
+        'userName': user.displayName ?? '',
+        'items': cart.items.values.map((i) => {
+          'id': i.id,
+          'name': i.name,
+          'price': i.price,
+          'quantity': i.quantity,
+          'imageUrl': i.imageUrl,
+        }).toList(),
+        'total': cart.totalPrice,
+        'type': _isDelivery ? 'delivery' : 'pickup',
+        'paymentMethod': _paymentMethod,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      await batch.commit();
+      await UserDataService.addLoyaltyPoints(cart.totalPrice);
+      cart.clear();
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A2E),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            content: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 64),
+              const SizedBox(height: 12),
+              const Text('Order Placed! 🎉', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
+              const SizedBox(height: 8),
+              Text(
+                '${_isDelivery ? "Delivery" : "Pickup"} · $_paymentMethod on ${_isDelivery ? "delivery" : "pickup"}',
+                style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
+                textAlign: TextAlign.center,
               ),
-            ),
-          ]),
-        ),
-      );
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B35), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                  onPressed: () { Navigator.pop(ctx); setState(() => _currentIndex = 0); },
+                  child: const Text('Back to Menu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ]),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to place order: $e')));
+      }
     }
   }
 
