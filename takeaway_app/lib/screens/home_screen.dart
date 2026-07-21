@@ -72,6 +72,10 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   bool get wantKeepAlive => true;
 
+  // Loyalty Points state
+  bool _useLoyaltyPoints = false;
+  int _userLoyaltyPoints = 0;
+
   @override
   void initState() {
     super.initState();
@@ -79,6 +83,13 @@ class _HomeScreenState extends State<HomeScreen>
     _loadFavorites();
     _fetchAll();
     _loadUserSettings();
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      UserDataService.listenForCompletedOrders(currentUser.uid);
+    }
+    UserDataService.getLoyaltyPoints().then((pts) {
+      if (mounted) setState(() => _userLoyaltyPoints = pts);
+    });
   }
 
   @override
@@ -1791,6 +1802,10 @@ class _HomeScreenState extends State<HomeScreen>
     final itemsList = cart.items.values.toList();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final maxRedeemablePoints = (_userLoyaltyPoints ~/ 10) * 10;
+    final loyaltyDiscount = (_useLoyaltyPoints && maxRedeemablePoints >= 10) ? (maxRedeemablePoints / 10.0) : 0.0;
+    final finalTotal = (cart.totalPrice - loyaltyDiscount).clamp(0.0, 99999.0);
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0A0A0F) : const Color(0xFFF8F9FA),
       appBar: AppBar(
@@ -1875,6 +1890,55 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                       )),
 
+                      // ── LOYALTY POINTS REDEMPTION ──
+                      Container(
+                        margin: const EdgeInsets.only(top: 4, bottom: 8),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withOpacity(0.06) : Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade200),
+                        ),
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFD600).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.stars_rounded, color: Color(0xFFFFD600), size: 24),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Loyalty Points ($_userLoyaltyPoints PTS)',
+                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    maxRedeemablePoints >= 10
+                                        ? 'Apply $maxRedeemablePoints pts for £${(maxRedeemablePoints / 10).toStringAsFixed(2)} off'
+                                        : 'Earn 1 pt per £1 spent (10 pts = £1 off)',
+                                    style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (maxRedeemablePoints >= 10)
+                              Switch(
+                                value: _useLoyaltyPoints,
+                                activeColor: const Color(0xFFFF6B35),
+                                onChanged: (val) => setState(() => _useLoyaltyPoints = val),
+                              ),
+                          ],
+                        ),
+                      ),
+
                       // ── PAYMENT METHOD ──
                       Container(
                         margin: const EdgeInsets.only(top: 4, bottom: 8),
@@ -1916,12 +1980,23 @@ class _HomeScreenState extends State<HomeScreen>
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        if (loyaltyDiscount > 0)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Loyalty Discount', style: TextStyle(color: Color(0xFFFFD600), fontWeight: FontWeight.bold, fontSize: 13)),
+                                Text('-£${loyaltyDiscount.toStringAsFixed(2)}', style: const TextStyle(color: Color(0xFFFFD600), fontWeight: FontWeight.bold, fontSize: 14)),
+                              ],
+                            ),
+                          ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                               Text(_isDelivery ? 'Delivery Total' : 'Pickup Total', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
-                              Text('£${cart.totalPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFFFF6B35))),
+                              Text('£${finalTotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFFFF6B35))),
                             ]),
                             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                               Text('Payment', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
@@ -1945,7 +2020,7 @@ class _HomeScreenState extends State<HomeScreen>
                               elevation: 0,
                             ),
                             child: Text(
-                              'Place Order · £${cart.totalPrice.toStringAsFixed(2)}',
+                              'Place Order · £${finalTotal.toStringAsFixed(2)}',
                               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                             ),
                           ),
@@ -2023,6 +2098,12 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     try {
+      final maxRedeemablePoints = (_userLoyaltyPoints ~/ 10) * 10;
+      final pointsRedeemed = (_useLoyaltyPoints && maxRedeemablePoints >= 10) ? maxRedeemablePoints : 0;
+      final discount = pointsRedeemed / 10.0;
+      final finalTotal = (cart.totalPrice - discount).clamp(0.0, 99999.0);
+      final pointsToEarn = finalTotal.floor();
+
       final orderRef = FirebaseFirestore.instance.collection('orders').doc();
       final batch = FirebaseFirestore.instance.batch();
 
@@ -2038,7 +2119,12 @@ class _HomeScreenState extends State<HomeScreen>
           'quantity': i.quantity,
           'imageUrl': i.imageUrl,
         }).toList(),
-        'total': cart.totalPrice,
+        'subtotal': cart.totalPrice,
+        'discountApplied': discount,
+        'pointsRedeemed': pointsRedeemed,
+        'total': finalTotal,
+        'pointsToEarn': pointsToEarn,
+        'pointsAwarded': false,
         'type': _isDelivery ? 'delivery' : 'pickup',
         'paymentMethod': _paymentMethod,
         'status': 'pending',
@@ -2046,7 +2132,14 @@ class _HomeScreenState extends State<HomeScreen>
       });
 
       await batch.commit();
-      await UserDataService.addLoyaltyPoints(cart.totalPrice);
+
+      if (pointsRedeemed > 0) {
+        await UserDataService.deductLoyaltyPoints(pointsRedeemed);
+      }
+
+      final updatedPoints = await UserDataService.getLoyaltyPoints();
+      if (mounted) setState(() { _userLoyaltyPoints = updatedPoints; _useLoyaltyPoints = false; });
+
       cart.clear();
 
       if (mounted) {
@@ -2062,7 +2155,7 @@ class _HomeScreenState extends State<HomeScreen>
               const Text('Order Placed! 🎉', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
               const SizedBox(height: 8),
               Text(
-                '${_isDelivery ? "Delivery" : "Pickup"} · $_paymentMethod on ${_isDelivery ? "delivery" : "pickup"}',
+                '${_isDelivery ? "Delivery" : "Pickup"} · $_paymentMethod on ${_isDelivery ? "delivery" : "pickup"}\nPoints will be credited once order status is completed!',
                 style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
                 textAlign: TextAlign.center,
               ),
@@ -2084,6 +2177,7 @@ class _HomeScreenState extends State<HomeScreen>
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to place order: $e')));
       }
     }
+  }
   }
 
   Widget _buildSettingsView() => const SettingsScreen();

@@ -1,21 +1,56 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class UserDataService {
   static const _loyaltyKey = 'loyalty_points';
   static const _addressesKey = 'user_addresses';
   static const _defaultAddressKey = 'default_address_id';
+  static StreamSubscription? _ordersSub;
 
   // ── LOYALTY ──
-  static Future<double> getLoyaltyPoints() async {
+  static Future<int> getLoyaltyPoints() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getDouble(_loyaltyKey) ?? 0.0;
+    return prefs.getInt(_loyaltyKey) ?? 0;
   }
 
-  static Future<void> addLoyaltyPoints(double amount) async {
+  static Future<void> addLoyaltyPoints(int amount) async {
+    if (amount <= 0) return;
     final prefs = await SharedPreferences.getInstance();
-    final current = prefs.getDouble(_loyaltyKey) ?? 0.0;
-    await prefs.setDouble(_loyaltyKey, current + amount);
+    final current = prefs.getInt(_loyaltyKey) ?? 0;
+    await prefs.setInt(_loyaltyKey, current + amount);
+  }
+
+  static Future<void> deductLoyaltyPoints(int amount) async {
+    if (amount <= 0) return;
+    final prefs = await SharedPreferences.getInstance();
+    final current = prefs.getInt(_loyaltyKey) ?? 0;
+    final updated = (current - amount).clamp(0, 9999999);
+    await prefs.setInt(_loyaltyKey, updated);
+  }
+
+  static void listenForCompletedOrders(String userId) {
+    _ordersSub?.cancel();
+    _ordersSub = FirebaseFirestore.instance
+        .collection('orders')
+        .where('userId', isEqualTo: userId)
+        .snapshots()
+        .listen((snapshot) async {
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final status = (data['status'] ?? '').toString().toLowerCase();
+        final pointsAwarded = data['pointsAwarded'] == true;
+        if (status == 'completed' && !pointsAwarded) {
+          final total = (data['total'] as num?)?.toDouble() ?? 0.0;
+          final pointsToEarn = data['pointsToEarn'] as int? ?? total.floor();
+          if (pointsToEarn > 0) {
+            await addLoyaltyPoints(pointsToEarn);
+          }
+          await doc.reference.update({'pointsAwarded': true});
+        }
+      }
+    });
   }
 
   // ── ADDRESSES ──

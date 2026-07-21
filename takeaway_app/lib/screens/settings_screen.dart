@@ -14,7 +14,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _offerNotifications = false;
-  double _loyaltyPoints = 0.0;
+  int _loyaltyPoints = 0;
 
   @override
   void initState() {
@@ -91,7 +91,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 18),
                   children: [
                     _card([
-                      _tile(Icons.workspace_premium_outlined, 'LOYALTY POINTS', trailing: _badge('RS. ${_loyaltyPoints.toStringAsFixed(2)}')),
+                      _tile(Icons.workspace_premium_outlined, 'LOYALTY POINTS', trailing: _badge('$_loyaltyPoints PTS')),
                       _divider(),
                       _tile(Icons.location_on_outlined, 'MY ADDRESSES', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AddressesScreen())), arrow: true),
                       _divider(),
