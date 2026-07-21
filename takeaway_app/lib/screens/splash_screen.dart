@@ -114,39 +114,40 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                             opacity: _logoOpacity.value,
                             child: Transform.scale(
                               scale: _logoScale.value,
-                              child: _buildLogo(96),
+                              child: _buildLogo(140),
                             ),
                           ),
-                          SizedBox(height: 20),
+                          const SizedBox(height: 24),
                           SlideTransition(
                             position: _nameOffset,
                             child: Opacity(
                               opacity: _nameOpacity.value,
-                              child: Text(
-                                'Takeaway',
+                              child: const Text(
+                                'District',
                                 style: TextStyle(
                                   fontFamily: 'Poppins',
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
                                   color: Colors.white,
+                                  letterSpacing: 1.2,
                                 ),
                               ),
                             ),
                           ),
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
                           Opacity(
-                            opacity: _taglineOpacity.value * (0.4 + 0.6), // pulse simulated within same animation
+                            opacity: _taglineOpacity.value,
                             child: Text(
-                              'Premium flavors, delivered smart',
-                              style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14),
+                              'Authentic Flavours & Takeaway',
+                              style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 15, letterSpacing: 0.5),
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 28.0),
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 28.0),
                     child: SizedBox(
                       height: 24,
                       width: 24,
@@ -166,47 +167,28 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Widget _buildLogo(double size) {
-    // Minimal stylized plate with fork + knife using simple drawing
-    return SizedBox(
+    return Container(
       width: size,
       height: size,
-      child: CustomPaint(
-        painter: _LogoPainter(),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(12),
+      child: ClipOval(
+        child: Image.asset(
+          'assets/images/app_icon.png',
+          fit: BoxFit.contain,
+        ),
       ),
     );
   }
 }
 
-class _LogoPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.white;
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width * 0.36;
-
-    // plate
-    paint.style = PaintingStyle.stroke;
-    paint.strokeWidth = size.width * 0.08;
-    canvas.drawCircle(center, radius, paint);
-
-    // fork
-    paint.style = PaintingStyle.fill;
-    final forkRect = Rect.fromCenter(center: Offset(center.dx - radius * 0.4, center.dy - radius * 0.1), width: size.width * 0.12, height: size.height * 0.5);
-    canvas.drawRect(forkRect, paint);
-    // tines
-    final tineHeight = size.height * 0.14;
-    canvas.drawRect(Rect.fromLTWH(forkRect.left, forkRect.top, forkRect.width * 0.25, tineHeight), paint);
-    canvas.drawRect(Rect.fromLTWH(forkRect.left + forkRect.width * 0.375, forkRect.top, forkRect.width * 0.25, tineHeight), paint);
-
-    // knife
-    final knifePath = Path();
-    knifePath.moveTo(center.dx + radius * 0.35, center.dy - radius * 0.25);
-    knifePath.quadraticBezierTo(center.dx + radius * 0.6, center.dy, center.dx + radius * 0.25, center.dy + radius * 0.35);
-    knifePath.lineTo(center.dx + radius * 0.18, center.dy + radius * 0.15);
-    knifePath.close();
-    canvas.drawPath(knifePath, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}

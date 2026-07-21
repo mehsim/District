@@ -12,9 +12,13 @@ import '../providers/cart_provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/floating_nav_bar.dart';
 import '../services/favorites_service.dart';
+import '../services/user_data_service.dart';
+import 'addresses_screen.dart';
 import 'category_products_screen.dart';
 import 'deal_detail_screen.dart';
+import 'orders_screen.dart';
 import 'product_detail_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -40,6 +44,12 @@ class _HomeScreenState extends State<HomeScreen>
   };
   bool _loading = true;
   bool _hasGlobalError = false;
+
+  // Settings state
+  bool _settingsLoading = true;
+  bool _offerNotifications = true;
+  double _loyaltyBalance = 327.56;
+  bool _accountDeleteLoading = false;
 
   // Favorites tracking
   final Set<String> _favorites = {};
@@ -67,6 +77,7 @@ class _HomeScreenState extends State<HomeScreen>
     _scrollController.addListener(_onScroll);
     _fetchAll();
     _loadFavorites();
+    _loadUserSettings();
   }
 
   @override
@@ -120,6 +131,161 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _loadFavorites() async {
     final favs = await FavoritesService.load();
     if (mounted) setState(() => _favorites.addAll(favs));
+  }
+
+  Future<void> _loadUserSettings() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _settingsLoading = false);
+      return;
+    }
+
+    try {
+      final snapshot = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final data = snapshot.data();
+      if (mounted) {
+        setState(() {
+          _offerNotifications = data?['offerNotifications'] ?? true;
+          _loyaltyBalance = _parsePrice(data?['loyaltyPoints'] ?? data?['walletBalance'] ?? '327.56');
+          _settingsLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _settingsLoading = false);
+    }
+  }
+
+  Future<void> _updateNotificationPreference(bool value) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() {
+      _offerNotifications = value;
+    });
+
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set(
+        {'offerNotifications': value},
+        SetOptions(merge: true),
+      );
+    } catch (_) {
+      if (mounted) setState(() => _offerNotifications = !value);
+    }
+  }
+
+  Future<void> _openSupportCenter() async {
+    if (!mounted) return;
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 48,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text('Support Center', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text('Ask us anything about your order, account, or loyalty rewards. We typically reply within 30 minutes.', style: TextStyle(fontSize: 14, color: Colors.black87)),
+              const SizedBox(height: 18),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.email_outlined, color: Color(0xFFFF6B35)),
+                title: const Text('Email support'),
+                subtitle: const Text('support@districtfood.app'),
+                onTap: () {
+                  Clipboard.setData(const ClipboardData(text: 'support@districtfood.app'));
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Support email copied to clipboard')));
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.phone_outlined, color: Color(0xFF0F172A)),
+                title: const Text('Call us'),
+                subtitle: const Text('+44 20 8123 4567'),
+                onTap: () {
+                  Clipboard.setData(const ClipboardData(text: '+44 20 8123 4567'));
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Support phone copied to clipboard')));
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _requestAccountDeletion() async {
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete account?'),
+          content: const Text('This will remove your profile and sign you out. This action cannot be undone.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+            ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Delete')),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() {
+      _accountDeleteLoading = true;
+    });
+
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).delete();
+      await user.delete();
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed('/signin');
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        final message = e.code == 'requires-recent-login'
+            ? 'Please sign in again before deleting your account.'
+            : 'Could not delete the account: ${e.message ?? e.code}';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account deletion failed. Please try again later.')));
+      }
+    } finally {
+      if (mounted) setState(() => _accountDeleteLoading = false);
+    }
+  }
+
+  Future<void> _navigateToAddresses() async {
+    if (!mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddressesScreen()));
+  }
+
+  Future<void> _navigateToOrders() async {
+    if (!mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => OrdersScreen()));
   }
 
   Future<void> _toggleFavorite(String itemId) async {
@@ -1610,117 +1776,133 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  bool _isDelivery = true;
+  String _paymentMethod = 'Cash';
+
   Widget _buildCartView() {
     final cart = Provider.of<CartProvider>(context);
     final itemsList = cart.items.values.toList();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0A0A0F) : const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Text('Your Cart 🛒', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        title: const Text('Your Cart', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
         actions: [
           if (itemsList.isNotEmpty)
-            TextButton(
-              onPressed: () => cart.clear(),
-              child: const Text('Clear', style: TextStyle(color: Color(0xFFEF4444))),
-            )
+            TextButton(onPressed: () => cart.clear(), child: const Text('Clear', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold))),
         ],
       ),
       body: itemsList.isEmpty
           ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.shopping_cart_outlined, size: 80, color: Colors.grey.shade300),
-                  const SizedBox(height: 16),
-                  const Text('Your cart is empty', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text('Add delicious items from the menu!', style: TextStyle(color: Colors.grey.shade500)),
-                ],
-              ),
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.shopping_cart_outlined, size: 80, color: Colors.grey.shade300),
+                const SizedBox(height: 16),
+                const Text('Your cart is empty', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text('Add delicious items from the menu!', style: TextStyle(color: Colors.grey.shade500)),
+              ]),
             )
           : Column(
               children: [
                 Expanded(
-                  child: ListView.separated(
-                    padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 100),
-                    itemCount: itemsList.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final item = itemsList[index];
-                      return Container(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                    children: [
+
+                      // ── DELIVERY / PICKUP TOGGLE ──
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withOpacity(0.06) : Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade200),
+                        ),
+                        padding: const EdgeInsets.all(6),
+                        child: Row(
+                          children: [
+                            _orderTypeBtn('Delivery', Icons.delivery_dining_rounded, true, isDark),
+                            _orderTypeBtn('Pickup', Icons.storefront_rounded, false, isDark),
+                          ],
+                        ),
+                      ),
+
+                      // ── CART ITEMS ──
+                      ...itemsList.map((item) => Container(
+                        margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).cardColor,
+                          color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
-                              blurRadius: 8,
-                            )
-                          ],
+                          border: Border.all(color: isDark ? Colors.white.withOpacity(0.07) : Colors.grey.shade200),
                         ),
                         child: Row(
                           children: [
                             ClipRRect(
                               borderRadius: BorderRadius.circular(12),
                               child: item.imageUrl != null && item.imageUrl!.isNotEmpty
-                                  ? CachedNetworkImage(
-                                      imageUrl: item.imageUrl!,
-                                      width: 60,
-                                      height: 60,
-                                      fit: BoxFit.cover,
-                                    )
-                                  : Container(
-                                      width: 60,
-                                      height: 60,
-                                      color: Colors.orange.shade50,
-                                      child: const Icon(Icons.fastfood, color: Color(0xFFFF6B35)),
-                                    ),
+                                  ? CachedNetworkImage(imageUrl: item.imageUrl!, width: 60, height: 60, fit: BoxFit.cover)
+                                  : Container(width: 60, height: 60, color: Colors.orange.shade50, child: const Icon(Icons.fastfood, color: Color(0xFFFF6B35))),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                                  const SizedBox(height: 4),
-                                  Text('£${(item.price * item.quantity).toStringAsFixed(2)}',
-                                      style: const TextStyle(color: Color(0xFFFF6B35), fontWeight: FontWeight.bold)),
-                                ],
-                              ),
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                const SizedBox(height: 4),
+                                Text('£${(item.price * item.quantity).toStringAsFixed(2)}', style: const TextStyle(color: Color(0xFFFF6B35), fontWeight: FontWeight.bold, fontSize: 15)),
+                              ]),
                             ),
                             Row(
                               children: [
-                                IconButton(
-                                  icon: const Icon(Icons.remove_circle_outline_rounded),
-                                  onPressed: () => cart.removeItem(item.id),
+                                _qtyBtn(Icons.remove_rounded, () => cart.removeItem(item.id), isDark),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  child: Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                                 ),
-                                Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                IconButton(
-                                  icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFFFF6B35)),
-                                  onPressed: () => cart.addItem(item.id, item.name, item.price, item.imageUrl),
-                                ),
+                                _qtyBtn(Icons.add_rounded, () => cart.addItem(item.id, item.name, item.price, item.imageUrl), isDark, active: true),
                               ],
-                            )
+                            ),
                           ],
                         ),
-                      );
-                    },
+                      )),
+
+                      // ── PAYMENT METHOD ──
+                      Container(
+                        margin: const EdgeInsets.only(top: 4, bottom: 8),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withOpacity(0.06) : Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade200),
+                        ),
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Payment Method', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                _paymentBtn('Cash', Icons.payments_outlined, isDark),
+                                const SizedBox(width: 10),
+                                _paymentBtn('Card', Icons.credit_card_rounded, isDark),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+
+                // ── BOTTOM CHECKOUT ──
                 Container(
-                  padding: const EdgeInsets.only(left: 20, right: 20, top: 16, bottom: 100),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
+                    color: isDark ? const Color(0xFF111118) : Colors.white,
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
-                        blurRadius: 16,
-                        offset: const Offset(0, -4),
-                      )
-                    ],
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 16, offset: const Offset(0, -4))],
                   ),
                   child: SafeArea(
                     top: false,
@@ -1730,37 +1912,38 @@ class _HomeScreenState extends State<HomeScreen>
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Total:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                            Text(
-                              '£${cart.totalPrice.toStringAsFixed(2)}',
-                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFFF6B35)),
-                            ),
+                            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(_isDelivery ? 'Delivery Total' : 'Pickup Total', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                              Text('£${cart.totalPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFFFF6B35))),
+                            ]),
+                            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                              Text('Payment', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                              Row(children: [
+                                Icon(_paymentMethod == 'Cash' ? Icons.payments_outlined : Icons.credit_card_rounded, size: 16, color: const Color(0xFFFF6B35)),
+                                const SizedBox(width: 4),
+                                Text('$_paymentMethod on ${_isDelivery ? "Delivery" : "Pickup"}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              ]),
+                            ]),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 14),
                         SizedBox(
                           width: double.infinity,
-                          height: 52,
+                          height: 54,
                           child: ElevatedButton(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Order placed successfully! 🎉'),
-                                  backgroundColor: Color(0xFF10B981),
-                                ),
-                              );
-                              cart.clear();
-                            },
+                            onPressed: () => _placeOrder(cart),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFFFF6B35),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              elevation: 0,
                             ),
-                            child: const Text('Proceed to Checkout',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                            child: Text(
+                              'Place Order · £${cart.totalPrice.toStringAsFixed(2)}',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
                           ),
                         ),
+                        const SizedBox(height: 8),
                       ],
                     ),
                   ),
@@ -1770,87 +1953,105 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildSettingsView() {
-    final user = FirebaseAuth.instance.currentUser;
-    final auth = Provider.of<AppAuthProvider>(context, listen: false);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings & Profile', style: TextStyle(fontWeight: FontWeight.bold)),
-        elevation: 0,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 100),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
+  Widget _orderTypeBtn(String label, IconData icon, bool isDelivery, bool isDark) => Expanded(
+        child: GestureDetector(
+          onTap: () => setState(() => _isDelivery = isDelivery),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10)
-              ],
+              color: _isDelivery == isDelivery ? const Color(0xFFFF6B35) : Colors.transparent,
+              borderRadius: BorderRadius.circular(13),
             ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: const Color(0xFFFF6B35),
-                  backgroundImage: user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
-                  child: user?.photoURL == null
-                      ? Text(
-                          (user?.displayName ?? user?.email ?? 'F')[0].toUpperCase(),
-                          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user?.displayName ?? 'Gourmet Foodie',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        user?.email ?? 'foodie@gourmet.app',
-                        style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(icon, size: 18, color: _isDelivery == isDelivery ? Colors.white : Colors.grey),
+              const SizedBox(width: 6),
+              Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: _isDelivery == isDelivery ? Colors.white : Colors.grey)),
+            ]),
           ),
-          const SizedBox(height: 24),
-          ListTile(
-            leading: const Icon(Icons.favorite_rounded, color: Color(0xFFEF4444)),
-            title: const Text('Saved Favorites'),
-            trailing: Text('${_favorites.length} items', style: TextStyle(color: Colors.grey.shade500)),
+        ),
+      );
+
+  Widget _paymentBtn(String method, IconData icon, bool isDark) {
+    final selected = _paymentMethod == method;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _paymentMethod = method),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFFFF6B35).withOpacity(0.12) : (isDark ? Colors.white.withOpacity(0.04) : Colors.grey.shade50),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: selected ? const Color(0xFFFF6B35) : Colors.transparent, width: 1.5),
           ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.notifications_outlined, color: Color(0xFFFF6B35)),
-            title: const Text('Notifications'),
-            trailing: Switch(value: true, onChanged: (_) {}, activeColor: const Color(0xFFFF6B35)),
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444)),
-            title: const Text('Sign Out', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
-            onTap: () async {
-              await auth.signOut();
-              if (mounted) {
-                Navigator.of(context).pushReplacementNamed('/signin');
-              }
-            },
-          ),
-        ],
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(icon, size: 18, color: selected ? const Color(0xFFFF6B35) : Colors.grey),
+            const SizedBox(width: 6),
+            Text(method, style: TextStyle(fontWeight: FontWeight.bold, color: selected ? const Color(0xFFFF6B35) : Colors.grey)),
+          ]),
+        ),
       ),
     );
   }
+
+  Widget _qtyBtn(IconData icon, VoidCallback onTap, bool isDark, {bool active = false}) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: active ? const Color(0xFFFF6B35) : (isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade100),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 16, color: active ? Colors.white : (isDark ? Colors.white : Colors.black87)),
+        ),
+      );
+
+  Future<void> _placeOrder(CartProvider cart) async {
+    final order = {
+      'items': cart.items.values.map((i) => {'name': i.name, 'qty': i.quantity, 'price': i.price}).toList(),
+      'total': cart.totalPrice,
+      'type': _isDelivery ? 'delivery' : 'pickup',
+      'payment': _paymentMethod,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+    // Award loyalty points (1 point per £1 spent)
+    await UserDataService.addLoyaltyPoints(cart.totalPrice);
+    cart.clear();
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A2E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 64),
+            const SizedBox(height: 12),
+            const Text('Order Placed! 🎉', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
+            const SizedBox(height: 8),
+            Text(
+              '${_isDelivery ? "Delivery" : "Pickup"} · $_paymentMethod on ${_isDelivery ? "delivery" : "pickup"}',
+              style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B35), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                onPressed: () { Navigator.pop(ctx); setState(() => _currentIndex = 0); },
+                child: const Text('Back to Menu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ]),
+        ),
+      );
+    }
+  }
+
+  Widget _buildSettingsView() => const SettingsScreen();
 
   // --- MAIN HOME CONTENT (CUSTOM SCROLL VIEW WITH SLIVERS) ---
 
