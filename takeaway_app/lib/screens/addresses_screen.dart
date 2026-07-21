@@ -111,7 +111,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
         'type': 'location',
       };
       await UserDataService.saveAddress(addr);
-      if (_defaultId == null) await UserDataService.setDefaultAddress(addr['id']!);
+      if (_defaultId == null) await UserDataService.setDefaultAddress(addr['id'].toString());
       _load();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));

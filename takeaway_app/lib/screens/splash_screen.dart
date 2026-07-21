@@ -44,7 +44,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       CurvedAnimation(parent: _controller, curve: Interval(0.44, 0.64, curve: Curves.easeIn)),
     );
 
-    Future.wait([
+    Future.wait<dynamic>([
       _controller.forward(),
       FirebaseAuth.instance.authStateChanges().first,
     ]).then((results) {
